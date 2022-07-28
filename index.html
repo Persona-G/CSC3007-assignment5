@@ -1,0 +1,152 @@
+<html>
+
+<head>
+  <title>Singapore PSI</title>
+
+  <script src="https://momentjs.com/downloads/moment.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.8.0/leaflet.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.8.0/leaflet.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" />
+
+  <style>
+    #map {
+      max-width: 100%;
+      height: 100%;
+    }
+
+    .legend {
+      padding: 6px 8px;
+      font-family: arial;
+      background: lightgray;
+      border-radius: 5px;
+      opacity: 0.9;
+      background-color: “black”;
+      line-height: 25px;
+      color: #555;
+      width: auto;
+    }
+
+    .legend div {
+      width: 18px;
+      height: 18px;
+      float: left;
+      margin-right: 8px;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+
+<body style="background-color: black;">
+  <div class="container" style="color: white;">
+    <header>
+      <div class="header mx-auto text-center">
+        <h1>PSI Readings In Singapore</h1>
+      </div>
+    </header>
+    <h6 id="time" class="text-center"></h6>
+    <div id="map"></div>
+  </div>
+  </div>
+  <script>
+
+  </script>
+
+  <script type="text/javascript">
+    $(document).ready(function () {
+      let center = L.bounds([1.53283, 104.1148], [1.16, 103.502]).getCenter();
+      let map = L.map('map').setView([center.x, center.y], 12);
+      
+      let layer = L.tileLayer('https://maps-{s}.onemap.sg/v3/Default/{z}/{x}/{y}.png', {
+            detectRetina: true,
+            maxZoom: 18,
+            minZoom: 11,
+            //Do not remove this attribution
+            attribution: '<img src="https://www.onemap.gov.sg/docs/maps/images/oneMap64-01.png" style="height:20px;width:20px;"/> OneMap | Map data &copy; contributors, <a href="http://SLA.gov.sg">Singapore Land Authority</a>'
+          });
+      
+      map.setMaxBounds([[1.53283, 104.1148], [1.16, 103.502]]);
+      layer.addTo(map)
+
+      function getColorbyPSI(psi) {
+        if (psi >= 0 && psi <= 50) {
+          return 'green';
+        } else if (psi > 50 && psi <= 100) {
+          return 'blue';
+        } else if (psi > 100 && psi <= 200) {
+          return 'yellow';
+        } else if (psi > 200 && psi <= 300) {
+          return 'orange';
+        } else {
+          return 'red';
+        }
+      }
+
+      let legend = new L.control({ position: 'topright' });
+      legend.onAdd = function (map) {
+        let div = L.DomUtil.create('div', 'legend'),
+          psiLevel = [0, 51, 101, 201, 301]
+        status = ["Good", "Moderate", "Unhealthy", "Very Unhealthy", "Hazardous"]
+
+        div.innerHTML += "<b>PSI Level:</b> <br>"
+
+        for (i = 0; i < psiLevel.length; i++) {
+          console.log("count: ", psiLevel[i])
+          console.log("colour: ", getColorbyPSI(psiLevel[i]))
+
+          div.innerHTML += '<div style="background:' + getColorbyPSI(psiLevel[i]) + '"></div> ' +
+            psiLevel[i] + (psiLevel[i + 1] ? '&ndash;' + (psiLevel[i + 1] - 1) + '<br>' : ' and above <br>');
+        }
+        return div;
+      }
+      legend.addTo(map);
+
+      $.getJSON("https://api.data.gov.sg/v1/environment/psi", function (data) {
+        // console.log(data)
+        // console.log(data["items"][0].readings)
+        let psi = data["items"][0].readings["psi_twenty_four_hourly"];
+        let regions = data.region_metadata;
+        let status = "";
+
+        for (i = 0; i < regions.length; i++) {
+          let location = regions[i].name;
+          if (psi[location] <= 50) {
+            status = "green";
+          } else if (psi[location] <= 100) {
+            status = "blue";
+          } else if (psi[location] <= 200) {
+            status = "yellow";
+          } else if (psi[location] <= 300) {
+            status = "orange";
+          } else {
+            status = "red";
+          }
+
+          function plot(latitude, longitude, region, color, map) {
+            L.circle(
+              [latitude, longitude], {
+              color: color,
+              fillColor: color,
+              fillOpacity: 0.5,
+              radius: 1500,
+            }
+            ).addTo(map);
+
+            L.marker(
+              [latitude, longitude], {
+              icon: L.divIcon({
+                className: "psiValue",
+                html: region,
+              }),
+            }
+            ).addTo(map);
+          }
+
+          plot(regions[i].label_location.latitude, regions[i].label_location.longitude, psi[regions[i].name], status, map);
+        }
+      });
+    });
+  </script>
+</body>
+
+</html>
